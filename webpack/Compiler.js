@@ -60,7 +60,7 @@ class Compiler extends Tapable {
             this.emitAssets(compilation, err => {
                 const stats = new Stats(compilation);
                 this.hooks.done.callAsync(stats, err => {
-                    return finallyCallback();
+                    return finallyCallback(err,stats);
                 });
             });
         };
