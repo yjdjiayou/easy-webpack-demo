@@ -1,0 +1,8 @@
+window.webpackJsonp("<%- asyncChunkId %>", {
+<% for(let i = 0;i < modules.length;i++){ %>
+    "<%- modules[i].moduleId %>":
+    (function(module, exports, __webpack_require__) {
+    <%- modules[i]._source %>
+    }),
+<% } %>
+});
