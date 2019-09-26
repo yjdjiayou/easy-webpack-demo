@@ -85,7 +85,14 @@ class NormalModule {
                     nodePath.replaceWithSourceString(`
                         __webpack_require__.e("${dependencyChunkId}").then(__webpack_require__.t.bind(null,"${dependencyModuleId}",7))
                     `);
-                    compilation._addAsyncModuleChain(this.context, dependencyModuleId, dependencyChunkId);
+                    const isExistInAsyncChunks = compilation.asyncChunks.findIndex((chunk) => {
+                        // console.log('moduleId=>', chunk.moduleId);
+                        // console.log('dependencyModuleId=>',dependencyModuleId);
+                        return chunk.moduleId === dependencyModuleId;
+                    });
+                    if(isExistInAsyncChunks < 0){
+                        compilation._addAsyncModuleChain(this.context, dependencyModuleId, dependencyChunkId);
+                    }
                 }
             }
         });

@@ -91,12 +91,14 @@ class Compilation extends Tapable {
         this.hooks.seal.call();
         this.hooks.beforeChunks.call();
         for (let entryModule of this.entries) {
+            // console.log('entryModule',entryModule);
             let chunk = new Chunk(entryModule);
             this.chunks.push(chunk);
             // 只要当前模块的 name 和当前 chunk 名字一样，就说明这个模块属于这个 chunk
             chunk.modules = this.modules.filter(module => module.name === chunk.name);
         }
         for (let asyncModule of this.asyncChunks) {
+            // console.log('asyncModule',asyncModule);
             let chunk = new Chunk(asyncModule);
             this.chunks.push(chunk);
             // 只要当前模块的 name 和当前 chunk 名字一样，就说明这个模块属于这个 chunk

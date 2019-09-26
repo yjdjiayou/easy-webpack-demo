@@ -203,7 +203,9 @@
 "./src/entry1.js":
 (function(module, exports, __webpack_require__) {
 let title = __webpack_require__("./src/title1.js");
+let titleCommon = __webpack_require__("./src/title-common.js");
 console.log(title);
+console.log(titleCommon);
 
 let button = document.createElement('button');
 button.innerHTML = '点我点我';
@@ -218,6 +220,11 @@ document.body.appendChild(button);
 "./src/title1.js":
 (function(module, exports, __webpack_require__) {
 module.exports = 'title1';
+}),
+
+"./src/title-common.js":
+(function(module, exports, __webpack_require__) {
+module.exports = 'titleCommon';
 }),
 
 });

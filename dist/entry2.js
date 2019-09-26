@@ -203,12 +203,28 @@
 "./src/entry2.js":
 (function(module, exports, __webpack_require__) {
 let title = __webpack_require__("./src/title2.js");
+let titleCommon = __webpack_require__("./src/title-common.js");
 console.log(title);
+console.log(titleCommon);
+
+let button = document.createElement('button');
+button.innerHTML = '点我点我';
+button.addEventListener('click', event => {
+  __webpack_require__.e("src_async").then(__webpack_require__.t.bind(null, "./src/async.js", 7)).then(result => {
+    console.log(result.default);
+  });
+});
+document.body.appendChild(button);
 }),
 
 "./src/title2.js":
 (function(module, exports, __webpack_require__) {
 module.exports = 'title2';
+}),
+
+"./src/title-common.js":
+(function(module, exports, __webpack_require__) {
+module.exports = 'titleCommon';
 }),
 
 });
