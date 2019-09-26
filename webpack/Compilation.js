@@ -57,6 +57,9 @@ class Compilation extends Tapable {
     }
 
     _addModuleChain(context, entry, name) {
+        // console.log(context);
+        // console.log(entry);
+        // console.log(path.posix.join(context, entry));
         let module = normalModuleFactory.create({
             // chunk 名字，单入口 chunk 名字默认为 main
             name,

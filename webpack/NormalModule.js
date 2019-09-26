@@ -43,19 +43,23 @@ class NormalModule {
                     let moduleName = node.arguments[0].value;// 模块名 => "./title"
                     // 如果模块名没有后缀，就添加 .js 后缀名
                     let extname = moduleName.split(path.posix.sep).pop().indexOf('.') === -1 ? ".js" : "";
-                    // console.log(moduleName, extname, path.posix.sep);
+                    let dependencyRequest;
 
-                    // 获取 当前模块 的依赖模块 .title.js 的绝对路径  = 当前模块  所在的绝对路径 + 依赖模块名 + 后缀名
-                    let dependencyRequest = path.posix.join(path.posix.dirname(this.request), moduleName + extname);
-                    // F:\webpack\my-demo\easy-webpack/src/title.js
-                    // console.log('dependencyRequest => ', dependencyRequest);
-                    // F:\webpack\my-demo\easy-webpack
-                    // console.log('this.context => ', this.context);
-                    // 获取依赖模块的模块 ID
+                    if(/.\//g.test(moduleName)){
+                        // './title.js'
+                        // 获取 当前模块 的依赖模块 .title.js 的所在路径  = 当前模块  所在的绝对路径 + 依赖模块名 + 后缀名
+                        dependencyRequest = path.posix.join(path.posix.dirname(this.request), moduleName + extname);
+                    }else{
+                        // 'jquery' 在 node_modules 下的第三方库
+                        // node_modules/jquery/dist/jquery.js
+                        // 获取 当前模块 的依赖模块 jquery 的所在路径  = node_modules + 依赖模块名 + dist + 依赖模块名 + 后缀名
+                        dependencyRequest = path.posix.join(path.posix.dirname(this.context),'node_modules', moduleName + '/dist/' + moduleName + extname);
+                    }
+                    console.log('dependencyRequest=>',dependencyRequest);
+                    // 获取依赖模块的模块 ID（依赖模块的所在位置——相对路径）
                     let dependencyModuleId = './' + path.posix.relative(this.context, dependencyRequest);
                     // ./src/title.js
                     // console.log('dependencyModuleId => ', dependencyModuleId);
-
                     this.dependencies.push({
                         // !!!!!!!!!!!!!!!!!!!!
                         // chunk 名字，不管当前是什么模块，这里都是其所属的 chunk 名字
