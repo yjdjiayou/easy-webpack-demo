@@ -42,6 +42,11 @@ class Compilation extends Tapable {
         this.chunks = [];
         // 存放所有的模块（包括入口 chunk 及其所依赖的模块）
         this.modules = [];
+        // 存放所有在 node_modules 下的第三方模块
+        this.vendors = [];
+        // 存放所有不在 node_modules 下，被调用次数大于 2 的公共模块
+        this.commons = [];
+        this.commonsCountMap = {};
         // 这是一个对象，key 是模块 ID（模块的绝路径） 值是模块实例（模块内容）
         this._modules = {};
         // 文件数组
@@ -93,6 +98,36 @@ class Compilation extends Tapable {
     seal(callback) {
         this.hooks.seal.call();
         this.hooks.beforeChunks.call();
+        for(let [index,module] of this.modules.entries()){
+            // 当前模块在 node_modules 目录下
+            if (/node_modules/.test(module.moduleId)) {
+                const isExistInVendors = this.vendors.findIndex((item) => {
+                    return item.moduleId === module.moduleId;
+                });
+                if (isExistInVendors < 0) {
+                    this.vendors.push(module);
+                }
+                // 不管 vendors 数组中有没有当前模块，都要把当前模块从所有模块数组中删除
+                // 如果用 map 遍历数组， splice 删除数组某个元素，数组遍历会被终止
+                this.modules.splice(index, 1);
+            } else {
+                if (!this.commonsCountMap[module.moduleId]) {
+                    this.commonsCountMap[module.moduleId] = {count: 1, module};
+                } else {
+                    this.commonsCountMap[module.moduleId].count++;
+                    if(this.commonsCountMap[module.moduleId].count >= 2){
+                        this.modules.splice(index, 1);
+                    }
+                }
+            }
+        }
+
+        for(let moduleMap in this.commonsCountMap){
+            if(this.commonsCountMap[moduleMap].count >= 2){
+                this.commons.push(this.commonsCountMap[moduleMap].module);
+            }
+        }
+
         for (let entryModule of this.entries) {
             // console.log('entryModule',entryModule);
             let chunk = new Chunk(entryModule);
@@ -118,23 +153,40 @@ class Compilation extends Tapable {
             chunk.files = [];
             const file = chunk.name + '.js';
             let source;
-            if(chunk.entryModule){
+            if (chunk.entryModule) {
                 source = mainRender({
                     entryChunkId: chunk.entryModule.moduleId,// 入口模块 ID
                     entryChunkName: chunk.name,// 入口模块名字
                     modules: chunk.modules
                 });
-            }else{
+            } else {
                 source = chunkRender({
-                    asyncChunkId: chunk.asyncModule.moduleId,// 异步模块 ID
+                    // asyncChunkId: chunk.asyncModule.moduleId,// 异步模块 ID
                     asyncChunkName: chunk.name,// 异步模块名字
                     modules: chunk.modules
                 });
             }
-
             chunk.files.push(file);
             this.emitAsset(file, source);
         }
+        if (this.vendors.length) {
+            const file = 'vendor.js';
+            let source = chunkRender({
+                asyncChunkName: 'vendor',// vendor 模块名字
+                modules: this.vendors
+            });
+            this.emitAsset(file, source);
+        }
+        if (this.commons.length) {
+            const file = 'commons.js';
+            let source = chunkRender({
+                asyncChunkName: 'commons',// vendor 模块名字
+                modules: this.commons
+            });
+            this.emitAsset(file, source);
+        }
+
+
     }
 
     emitAsset(file, source) {
@@ -144,3 +196,5 @@ class Compilation extends Tapable {
 }
 
 module.exports = Compilation;
+
+

@@ -55,7 +55,7 @@ class NormalModule {
                         // 获取 当前模块 的依赖模块 jquery 的所在路径  = node_modules + 依赖模块名 + dist + 依赖模块名 + 后缀名
                         dependencyRequest = path.posix.join(path.posix.dirname(this.context),'node_modules', moduleName + '/dist/' + moduleName + extname);
                     }
-                    console.log('dependencyRequest=>',dependencyRequest);
+                    // console.log('dependencyRequest=>',dependencyRequest);
                     // 获取依赖模块的模块 ID（依赖模块的所在位置——相对路径）
                     let dependencyModuleId = './' + path.posix.relative(this.context, dependencyRequest);
                     // ./src/title.js

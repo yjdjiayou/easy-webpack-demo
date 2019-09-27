@@ -1,9 +1,9 @@
 // let title = require('./title1');
-// let titleCommon = require('./title-common');
+let titleCommon = require('./title-common');
 let $ = require('jquery');
 // console.log(title);
 console.log($(document).attr('title'));
-// console.log(titleCommon);
+console.log(titleCommon);
 
 // let button = document.createElement('button');
 // button.innerHTML = '点我点我';
