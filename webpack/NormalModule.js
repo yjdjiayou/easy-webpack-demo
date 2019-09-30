@@ -5,6 +5,7 @@ const babylon = require('babylon');
 let types = require('babel-types');
 let generate = require('babel-generator').default;
 let traverse = require('babel-traverse').default;
+let runLoaders = require('./loader-runner.js').default;
 
 class NormalModule {
     constructor({name, context, request}) {
@@ -23,9 +24,47 @@ class NormalModule {
         this._source = null;
     }
 
-    build(compilation) {
+    getSource(request, compilation) {
         // 读取 当前模块 的内容
-        let originalSource = compilation.inputFileSystem.readFileSync(this.request, 'utf8');
+        // let source;
+        let source = compilation.inputFileSystem.readFileSync(this.request, 'utf8');
+        let {module: {rules}} = compilation.options;
+        for (let i = 0; i < rules.length; i++) {
+            let rule = rules[i];
+            if (rule.test.test(request)) {
+                let loaders = rule.use;
+              /*  let loaders = rule.use.map((loaderName)=>{
+                    return path.resolve(this.context, 'loaders', loaderName);
+                });
+                runLoaders({
+                    resource:this.request,
+                    loaders,
+                    context: {},
+                    readResource: fs.readFileSync.bind(fs)
+                }, function (err, result) {
+                    console.log(result);
+                });*/
+                let loaderIndex = loaders.length - 1;
+                let iterateLoaders = () => {
+                    let loaderName = loaders[loaderIndex];
+                    const loaderPath = path.resolve(this.context, 'loaders', loaderName);
+                    // console.log(loaderPath);
+                    let loader = require(loaderPath);
+                    source = loader(source);
+                    if (loaderIndex > 0) {
+                        loaderIndex--;
+                        iterateLoaders();
+                    }
+                };
+                iterateLoaders();
+                 // break;
+            }
+        }
+        return source;
+    }
+
+    build(compilation) {
+        let originalSource = this.getSource(this.request, compilation);
         // 将 当前模块 的内容转换成 AST
         const ast = babylon.parse(originalSource, {
             plugins: ['dynamicImport']
@@ -43,19 +82,23 @@ class NormalModule {
                     let moduleName = node.arguments[0].value;// 模块名 => "./title"
                     // 如果模块名没有后缀，就添加 .js 后缀名
                     let extname = moduleName.split(path.posix.sep).pop().indexOf('.') === -1 ? ".js" : "";
-                    // console.log(moduleName, extname, path.posix.sep);
+                    let dependencyRequest;
 
-                    // 获取 当前模块 的依赖模块 .title.js 的绝对路径  = 当前模块  所在的绝对路径 + 依赖模块名 + 后缀名
-                    let dependencyRequest = path.posix.join(path.posix.dirname(this.request), moduleName + extname);
-                    // F:\webpack\my-demo\easy-webpack/src/title.js
-                    // console.log('dependencyRequest => ', dependencyRequest);
-                    // F:\webpack\my-demo\easy-webpack
-                    // console.log('this.context => ', this.context);
-                    // 获取依赖模块的模块 ID
+                    if (/.\//g.test(moduleName)) {
+                        // './title.js'
+                        // 获取 当前模块 的依赖模块 .title.js 的所在路径  = 当前模块  所在的绝对路径 + 依赖模块名 + 后缀名
+                        dependencyRequest = path.posix.join(path.posix.dirname(this.request), moduleName + extname);
+                    } else {
+                        // 'jquery' 在 node_modules 下的第三方库
+                        // node_modules/jquery/dist/jquery.js
+                        // 获取 当前模块 的依赖模块 jquery 的所在路径  = node_modules + 依赖模块名 + dist + 依赖模块名 + 后缀名
+                        dependencyRequest = path.posix.join(path.posix.dirname(this.context), 'node_modules', moduleName + '/dist/' + moduleName + extname);
+                    }
+                    // console.log('dependencyRequest=>',dependencyRequest);
+                    // 获取依赖模块的模块 ID（依赖模块的所在位置——相对路径）
                     let dependencyModuleId = './' + path.posix.relative(this.context, dependencyRequest);
                     // ./src/title.js
                     // console.log('dependencyModuleId => ', dependencyModuleId);
-
                     this.dependencies.push({
                         // !!!!!!!!!!!!!!!!!!!!
                         // chunk 名字，不管当前是什么模块，这里都是其所属的 chunk 名字
@@ -85,7 +128,12 @@ class NormalModule {
                     nodePath.replaceWithSourceString(`
                         __webpack_require__.e("${dependencyChunkId}").then(__webpack_require__.t.bind(null,"${dependencyModuleId}",7))
                     `);
-                    compilation._addAsyncModuleChain(this.context, dependencyModuleId, dependencyChunkId);
+                    const isExistInAsyncChunks = compilation.asyncChunks.findIndex((chunk) => {
+                        return chunk.moduleId === dependencyModuleId;
+                    });
+                    if (isExistInAsyncChunks < 0) {
+                        compilation._addAsyncModuleChain(this.context, dependencyModuleId, dependencyChunkId);
+                    }
                 }
             }
         });
