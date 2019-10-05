@@ -26,12 +26,27 @@ class NormalModule {
 
     getSource(request, compilation) {
         // 读取 当前模块 的内容
+        // let source;
         let source = compilation.inputFileSystem.readFileSync(this.request, 'utf8');
         let {module: {rules}} = compilation.options;
         for (let i = 0; i < rules.length; i++) {
             let rule = rules[i];
             if (rule.test.test(request)) {
                 let loaders = rule.use;
+                // let loaders = rule.use.map((loaderName)=>{
+                //     return path.resolve(this.context, 'loaders', loaderName);
+                // });
+              /*  runLoaders({
+                    resource:this.request,
+                    loaders,
+                    context: {},
+                    readResource: fs.readFileSync.bind(fs)
+                    // readResource: compilation.inputFileSystem.readFileSync.bind(compilation)
+                }, function (err, result) {
+                    source = result;
+                    console.log(err);
+                    console.log(result);
+                });*/
                 let loaderIndex = loaders.length - 1;
                 let iterateLoaders = () => {
                     let loaderName = loaders[loaderIndex];
@@ -45,6 +60,7 @@ class NormalModule {
                     }
                 };
                 iterateLoaders();
+                 // break;
             }
         }
         return source;
@@ -80,6 +96,7 @@ class NormalModule {
                         // node_modules/jquery/dist/jquery.js
                         // 获取 当前模块 的依赖模块 jquery 的所在路径  = node_modules + 依赖模块名 + dist + 依赖模块名 + 后缀名
                         dependencyRequest = path.posix.join(path.posix.dirname(this.context), 'node_modules', moduleName + '/dist/' + moduleName + extname);
+
                     }
                     // console.log('dependencyRequest=>',dependencyRequest);
                     // 获取依赖模块的模块 ID（依赖模块的所在位置——相对路径）
@@ -131,15 +148,9 @@ class NormalModule {
         this.moduleId = './' + path.posix.relative(this.context, this.request);
         // 当前模块 对应的源码
         this._source = code;
-        // 将 当前模块 添加到 compilation.moduleMap 中
-        if (compilation.moduleMaps[this.moduleId]) {
-            compilation.moduleMaps[this.moduleId].count += 1;
-        } else {
-            compilation.moduleMaps[this.moduleId] = {
-                module: this,
-                count: 1
-            };
-        }
+        // 此时已经是编译完成了
+        // 将 当前模块 添加到 compilation.modules 中
+        compilation.modules.push(this);
         // 这是一个对象，key 是模块 ID（模块路径） 值是模块实例（模块内容）
         compilation._modules[this.request] = this;
         // 递归解析 当前模块 依赖的模块

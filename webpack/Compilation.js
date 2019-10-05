@@ -42,6 +42,7 @@ class Compilation extends Tapable {
         this.chunks = [];
         // 存放所有的模块（包括入口 chunk 、异步 chunk 及其所依赖的模块）
         this.modules = [];
+        this.moduleMaps = {};
         // 存放所有在 node_modules 下的第三方模块
         this.vendors = [];
         // 存放所有不在 node_modules 下，被调用次数大于 2 的公共模块
@@ -100,8 +101,18 @@ class Compilation extends Tapable {
         this.hooks.seal.call();
         this.hooks.beforeChunks.call();
 
-        this.extractVendorsAndGetCommonsMap();
-        this.extractCommons();
+        for(let moduleId in this.moduleMaps){
+            const moduleMap = this.moduleMaps[moduleId];
+            // 当前模块在 node_modules 目录下
+            if (/node_modules/.test(moduleId)) {
+                this.vendors.push(moduleMap.module);
+                delete this.moduleMaps[moduleId];
+            } else if(moduleMap.count > 1){
+                this.commons.push(moduleMap.module);
+                delete this.moduleMaps[moduleId];
+            }
+        }
+
         this.setEntryChunks();
         this.setAsyncChunks();
 
@@ -111,74 +122,37 @@ class Compilation extends Tapable {
     }
 
     /**
-     * 提取 node_modules 目录下的模块以及获取公共模块的 map
-     */
-    extractVendorsAndGetCommonsMap(){
-        for (let i = this.modules.length - 1; i >= 0; i--) {
-            // console.log(i);
-            const module = this.modules[i];
-            // 当前模块在 node_modules 目录下
-            if (/node_modules/.test(module.moduleId)) {
-                const isExistInVendors = this.vendors.findIndex((item) => {
-                    return item.moduleId === module.moduleId;
-                });
-                if (isExistInVendors < 0) {
-                    this.vendors.push(module);
-                }
-                // 不管 vendors 数组中有没有当前模块，都要把当前模块从所有模块数组中删除
-                // 如果用 map 遍历数组， splice 删除数组某个元素，数组遍历会被终止
-                this.modules.splice(i, 1);
-            } else {
-                if (!this.commonsMap[module.moduleId]) {
-                    this.commonsMap[module.moduleId] = {count: 1, module};
-                } else {
-                    this.commonsMap[module.moduleId].count++;
-                }
-            }
-        }
-    }
-
-    /**
-     * 提取公共模块
-     */
-    extractCommons(){
-        for (let key in this.commonsMap) {
-            const moduleMap = this.commonsMap[key];
-            // 引用次数大于 2 的，才会被提取到 commons 中
-            if (moduleMap.count < 2) return;
-            this.commons.push(moduleMap.module);
-            for (let i = this.modules.length - 1; i >= 0; i--) {
-                if (this.modules[i].moduleId === moduleMap.module.moduleId) {
-                    this.modules.splice(i, 1);
-                }
-            }
-        }
-    }
-
-    /**
      * 设置入口 chunk
      */
     setEntryChunks(){
-        for (let entryModule of this.entries) {
-            // console.log('entryModule',entryModule);
+        this.entries.map((entryModule)=>{
             let chunk = new Chunk(entryModule);
             this.chunks.push(chunk);
             // 只要当前模块的 name 和当前 chunk 名字一样，就说明这个模块属于这个 chunk
-            chunk.modules = this.modules.filter(module => module.name === chunk.name);
-        }
+            for(let moduleId in this.moduleMaps){
+                const moduleMap = this.moduleMaps[moduleId];
+                if(moduleMap.module.name === chunk.name){
+                    chunk.modules.push(moduleMap.module);
+                }
+            }
+        });
     }
 
     /**
      * 设置异步 chunk
      */
     setAsyncChunks(){
-        for (let asyncModule of this.asyncChunks) {
-            // console.log('asyncModule',asyncModule);
+        this.asyncChunks.map((asyncModule)=>{
             let chunk = new Chunk(asyncModule);
             this.chunks.push(chunk);
             // 只要当前模块的 name 和当前 chunk 名字一样，就说明这个模块属于这个 chunk
-            chunk.modules = this.modules.filter(module => module.name === chunk.name);
-        }
+            for(let moduleId in this.moduleMaps){
+                const moduleMap = this.moduleMaps[moduleId];
+                if(moduleMap.module.name === chunk.name){
+                    chunk.modules.push(moduleMap.module);
+                }
+            }
+        });
     }
 
 
@@ -196,7 +170,7 @@ class Compilation extends Tapable {
                     entryChunkName: chunk.name,// 入口模块名字
                     modules: chunk.modules
                 });
-            } else {
+            } else if(chunk.asyncModule) {
                 source = chunkRender({
                     chunkName: chunk.name,// 异步模块名字
                     modules: chunk.modules
@@ -205,7 +179,6 @@ class Compilation extends Tapable {
             chunk.files.push(file);
             this.emitAsset(file, source);
         });
-
         if (this.vendors.length) {
             const file = 'vendors.js';
             let source = chunkRender({
